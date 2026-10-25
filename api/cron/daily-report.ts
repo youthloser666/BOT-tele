@@ -2,18 +2,25 @@ import { db } from '../../src/services/supabase';
 import { telegramService } from '../../src/services/telegram';
 import { config } from '../../src/utils/config';
 
-export default async function handler(req: Request) {
+export default async function handler(req: any, res?: any) {
+  const authHeader = typeof req.headers?.get === 'function'
+    ? req.headers.get('authorization')
+    : req.headers?.['authorization'];
+
   if (config.monitoring.cronSecret) {
-    const authHeader = req.headers.get('authorization');
     if (authHeader !== `Bearer ${config.monitoring.cronSecret}`) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      if (!res) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      }
+      return res.status(401).json({ error: 'Unauthorized' });
     }
   }
 
   try {
     const websites = await db.getAllWebsites();
     if (websites.length === 0) {
-      return new Response(JSON.stringify({ message: 'No websites to report' }), { status: 200 });
+      if (!res) return new Response(JSON.stringify({ message: 'No websites to report' }), { status: 200 });
+      return res.status(200).json({ message: 'No websites to report' });
     }
 
     let reportText = `🌅 <b>LAPORAN HARIAN MONITORING WEBSITE</b>\n\n`;
@@ -37,11 +44,14 @@ export default async function handler(req: Request) {
 
     await telegramService.broadcastToAdmins(reportText);
 
-    return new Response(JSON.stringify({ success: true, count: websites.length }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    if (!res) {
+      return new Response(JSON.stringify({ success: true, count: websites.length }), { status: 200 });
+    }
+    return res.status(200).json({ success: true, count: websites.length });
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    if (!res) {
+      return new Response(JSON.stringify({ error: err.message }), { status: 500 });
+    }
+    return res.status(500).json({ error: err.message });
   }
 }
