@@ -1,7 +1,6 @@
 {
   "name": "telegram-website-monitor",
   "version": "1.0.0",
-  "type": "module",
   "scripts": {
     "dev": "bun run src/dev.ts",
     "check": "tsc --noEmit",
