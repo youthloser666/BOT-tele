@@ -18,12 +18,12 @@ export function registerBotCommands() {
 
   // /start
   bot.command('start', async (ctx) => {
-    await ctx.reply(messages.welcome(ctx.me.first_name), { parse_mode: 'HTML' });
+    await ctx.reply(messages.welcome(ctx.me?.first_name || 'MonitorBot'), { parse_mode: 'HTML' });
   });
 
   // /help
   bot.command('help', async (ctx) => {
-    await ctx.reply(messages.welcome(ctx.me.first_name), { parse_mode: 'HTML' });
+    await ctx.reply(messages.welcome(ctx.me?.first_name || 'MonitorBot'), { parse_mode: 'HTML' });
   });
 
   // /add <url> [nama]
