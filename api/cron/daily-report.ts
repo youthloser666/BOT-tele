@@ -1,6 +1,7 @@
 import { db } from '../../src/services/supabase';
 import { telegramService } from '../../src/services/telegram';
 import { config } from '../../src/utils/config';
+import { messages } from '../../src/bot/messages';
 
 export default async function handler(req: any, res?: any) {
   const authHeader = typeof req.headers?.get === 'function'
@@ -23,25 +24,20 @@ export default async function handler(req: any, res?: any) {
       return res.status(200).json({ message: 'No websites to report' });
     }
 
-    let reportText = `🌅 <b>LAPORAN HARIAN MONITORING WEBSITE</b>\n\n`;
-
+    const items = [];
     for (const site of websites) {
-      const stats = await db.get24hStats(site.id);
-      const icon = stats.uptimePercent >= 99 ? '🟢' : stats.uptimePercent >= 90 ? '🟡' : '🔴';
-      reportText += `${icon} <b>${site.name}</b>\n`;
-      reportText += `• Uptime: <b>${stats.uptimePercent}%</b>\n`;
-      reportText += `• Avg Latensi: <b>${stats.avgLatency}ms</b>\n`;
-      reportText += `• Insiden Down: <b>${stats.downCount} kali</b>\n\n`;
+      const stats24h = await db.get24hStats(site.id);
+      const latestLogs = await db.getLatestLogs(site.id, 1);
+      const secEvents = await db.getLatestSecurityEvents(site.id, 10);
+      items.push({
+        website: site,
+        stats24h,
+        latestLog: latestLogs[0] || null,
+        securityEventsCount: secEvents.length,
+      });
     }
 
-    reportText += `📅 <i>Laporan Harian: ${new Date().toLocaleDateString('id-ID', {
-      timeZone: 'Asia/Jakarta',
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })}</i>`;
-
+    const reportText = messages.comprehensiveReport(items);
     await telegramService.broadcastToAdmins(reportText);
 
     if (!res) {

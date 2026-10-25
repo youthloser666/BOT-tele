@@ -5,9 +5,26 @@ import { isAdmin } from '../utils/config';
 import { checkSingleWebsite } from '../monitor/checker';
 
 export function registerBotCommands() {
+  // Command /id bebas diakses siapa saja untuk mengetahui ID chat / grup
+  bot.command('id', async (ctx) => {
+    const isGroup = ctx.chat.type === 'group' || ctx.chat.type === 'supergroup';
+    await ctx.reply(
+      `🆔 <b>Informasi Chat:</b>\n• <b>Tipe:</b> ${isGroup ? 'Grup' : 'Pribadi'}\n• <b>Chat ID:</b> <code>${ctx.chat.id}</code>\n• <b>User ID Anda:</b> <code>${ctx.from?.id || '-'}</code>`,
+      { parse_mode: 'HTML' }
+    );
+  });
+
   // Middleware: cek admin
   bot.use(async (ctx, next) => {
-    if (!ctx.chat || !isAdmin(ctx.chat.id)) {
+    const isUserAdmin =
+      (ctx.from && isAdmin(ctx.from.id)) ||
+      (ctx.chat && isAdmin(ctx.chat.id));
+
+    if (!isUserAdmin) {
+      // Jika di grup, jangan spam pesan error untuk chat obrolan member lain
+      if (ctx.chat?.type === 'group' || ctx.chat?.type === 'supergroup') {
+        return;
+      }
       await ctx.reply('⛔ <b>Akses Ditolak:</b> Anda bukan admin bot ini.', {
         parse_mode: 'HTML',
       });
@@ -238,19 +255,23 @@ export function registerBotCommands() {
       return;
     }
 
-    let reportText = `📊 <b>LAPORAN PERFORMA WEBSITE (24 Jam Terakhir)</b>\n\n`;
-
+    const items = [];
     for (const site of websites) {
-      const stats = await db.get24hStats(site.id);
-      const icon = stats.uptimePercent >= 99 ? '🟢' : stats.uptimePercent >= 90 ? '🟡' : '🔴';
-      reportText += `${icon} <b>${site.name}</b>\n`;
-      reportText += `• Uptime: <b>${stats.uptimePercent}%</b>\n`;
-      reportText += `• Rata-rata Latensi: <b>${stats.avgLatency}ms</b>\n`;
-      reportText += `• Downtime: <b>${stats.downCount} kali</b>\n\n`;
+      const stats24h = await db.get24hStats(site.id);
+      const latestLogs = await db.getLatestLogs(site.id, 1);
+      const secEvents = await db.getLatestSecurityEvents(site.id, 10);
+      items.push({
+        website: site,
+        stats24h,
+        latestLog: latestLogs[0] || null,
+        securityEventsCount: secEvents.length,
+      });
     }
 
-    reportText += `⏰ <i>Digenerate pada: ${new Date().toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })} WIB</i>`;
-
-    await ctx.reply(reportText, { parse_mode: 'HTML' });
+    const reportText = messages.comprehensiveReport(items);
+    await ctx.reply(reportText, {
+      parse_mode: 'HTML',
+      link_preview_options: { is_disabled: true },
+    });
   });
 }

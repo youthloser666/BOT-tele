@@ -123,4 +123,67 @@ ${severityEmoji} <b>[SECURITY ALERT] ${event.event_type.toUpperCase()} DETECTED!
 🔑 <b>ID:</b> <code>${website.id}</code>
     `.trim();
   },
+
+  comprehensiveReport(
+    items: Array<{
+      website: Website;
+      stats24h: { uptimePercent: number; avgLatency: number; downCount: number; totalChecks: number };
+      latestLog: CheckLog | null;
+      securityEventsCount: number;
+    }>
+  ): string {
+    const now = new Date().toLocaleString('id-ID', {
+      timeZone: 'Asia/Jakarta',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    let text = `📈 <b>LAPORAN LENGKAP MONITORING WEBSITE</b>\n`;
+    text += `📅 <i>Waktu: ${now} WIB</i>\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    let totalUptime = 0;
+    let upCount = 0;
+
+    for (let i = 0; i < items.length; i++) {
+      const { website, stats24h, latestLog, securityEventsCount } = items[i];
+      const isUp = website.last_status_up === true;
+      if (isUp) upCount++;
+      totalUptime += stats24h.uptimePercent;
+
+      const statusIcon = isUp ? '🟢 UP' : '🔴 DOWN';
+      const statusCode = latestLog?.status_code ? ` (HTTP ${latestLog.status_code})` : '';
+      const lastCheck = website.last_check_at
+        ? new Date(website.last_check_at).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }) + ' WIB'
+        : '-';
+
+      const secStatus = securityEventsCount === 0
+        ? '🛡️ Aman (0 Anomali)'
+        : `⚠️ Perhatian (${securityEventsCount} Catatan)`;
+
+      text += `🌐 <b>${i + 1}. ${website.name}</b>\n`;
+      text += `🔗 ${website.url}\n`;
+      text += `• <b>Kondisi:</b> ${statusIcon}${statusCode}\n`;
+      text += `• <b>Uptime 24 Jam:</b> <code>${stats24h.uptimePercent}%</code>\n`;
+      text += `• <b>Rata-rata Latensi:</b> ${stats24h.avgLatency}ms\n`;
+      text += `• <b>Latensi Terkini:</b> ${latestLog?.response_time ? `${latestLog.response_time}ms` : '-'}\n`;
+      text += `• <b>Insiden Down:</b> ${stats24h.downCount} kali\n`;
+      text += `• <b>Status Keamanan:</b> ${secStatus}\n`;
+      text += `• <b>Terakhir Dicek:</b> ${lastCheck}\n\n`;
+    }
+
+    const avgGlobalUptime = items.length > 0 ? (totalUptime / items.length).toFixed(1) : '100';
+    text += `━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    text += `📊 <b>Ringkasan Global:</b>\n`;
+    text += `• Website Dipantau: <b>${items.length}</b>\n`;
+    text += `• Online Saat Ini: <b>${upCount}/${items.length}</b>\n`;
+    text += `• Rata-rata Uptime: <b>${avgGlobalUptime}%</b>\n`;
+    text += `• Status Engine: 🟢 <b>Berjalan Normal</b>`;
+
+    return text.trim();
+  },
 };
